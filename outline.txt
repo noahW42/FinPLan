@@ -1,0 +1,17 @@
+Finacial planner
+Outline: 
+    * finnacial planner provides an easilly acessible way track
+    expenses and catigorize payments with a web based service
+Features(MVP): 
+    * see previous expenses and catigorize them by merchant or(needs/wants) 
+     on a time scale(ex starbucks last 30 days : $300)
+    *set finacial goals i.e( save x amount of money by x date 
+        || spend less than $x this week at starbucks)
+    * plan reocurrying purchases(rent/utilities/car) 
+
+database:
+    User table
+        User_id
+        Email
+        Password
+        
