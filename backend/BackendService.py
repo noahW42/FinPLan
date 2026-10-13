@@ -30,18 +30,25 @@ from User import User
 from PlaidItems import PlaidItem
 from Transaction import Transaction
 
+IS_PROD = bool(os.environ.get("FRONTEND_URL"))  # set on Render, not locally
+
+db_url = os.environ.get("DATABASE_URL", "sqlite:///app.db")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
-app.secret_key = os.environ["SECRET_KEY"]
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 
 app.config.update(
-    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SAMESITE="None" if IS_PROD else "Lax",
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=False,  # True once you're on HTTPS
+    SESSION_COOKIE_SECURE=IS_PROD,
 )
 
-CORS(app, supports_credentials=True, origins=["http://localhost:5173"])  # your frontend origin
-
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+CORS(app, supports_credentials=True, origins=[FRONTEND_URL])
 db.init_app(app)
 login_manager.init_app(app)
 
@@ -91,6 +98,10 @@ def handle_unexpected(e):
         return e
     app.logger.exception("Unhandled error")
     return jsonify(error="Internal server error"), 500
+
+@app.get("/health")
+def health():
+    return jsonify(status="ok")
 
 
 ### PLAID ENDPOINTS
