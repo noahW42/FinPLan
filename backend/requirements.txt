@@ -7,4 +7,4 @@ plaid-python>=20.0
 cryptography>=42.0
 python-dotenv>=1.0
 gunicorn>=21.2
-psycopg2-binary>=2.9
+psycopg[binary]>=3.2

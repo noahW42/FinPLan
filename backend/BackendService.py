@@ -34,7 +34,9 @@ IS_PROD = bool(os.environ.get("FRONTEND_URL"))  # set on Render, not locally
 
 db_url = os.environ.get("DATABASE_URL", "sqlite:///app.db")
 if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+    db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
