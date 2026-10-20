@@ -1,5 +1,5 @@
 from typing import List
-from backend.budget import Budget
+from budget import Budget
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from flask_login import UserMixin

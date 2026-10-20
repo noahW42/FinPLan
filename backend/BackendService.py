@@ -239,6 +239,104 @@ def _delete_transaction(plaid_transaction_id):
     if tx:
         db.session.delete(tx)
 
+### Budget endpoints ###
+@app.post("/budgets")
+@login_required
+def set_budget():
+    data = request.get_json() or {}
+    vendor = (data.get("vendor") or "").strip() or None
+    amount = data.get("amount_dollars")
+
+    if amount is None or amount <= 0:
+        return jsonify(error="A positive budget amount is required"), 400
+
+    budget = db.session.scalar(
+        select(Budget).where(Budget.user_id == current_user.id, Budget.vendor == vendor)
+    )
+    if budget is None:
+        budget = Budget(user_id=current_user.id, vendor=vendor)
+        db.session.add(budget)
+
+    budget.amount_cents = round(amount * 100)
+    db.session.commit()
+    return jsonify(id=budget.id, vendor=budget.vendor, amount_cents=budget.amount_cents), 201
+
+
+@app.get("/budgets")
+@login_required
+def get_budgets():
+    budgets = db.session.scalars(select(Budget).where(Budget.user_id == current_user.id))
+    return jsonify(budgets=[
+        {"id": b.id, "vendor": b.vendor, "amount_cents": b.amount_cents} for b in budgets
+    ])
+
+
+@app.delete("/budgets/<int:budget_id>")
+@login_required
+def delete_budget(budget_id):
+    budget = db.session.get(Budget, budget_id)
+    if budget is None or budget.user_id != current_user.id:
+        return jsonify(error="Not found"), 404
+    db.session.delete(budget)
+    db.session.commit()
+    return jsonify(success=True)
+
+
+MONTHS_BY_TIMESPAN = {"3m": 3, "6m": 6, "1y": 12, "2y": 24}
+
+@app.get("/budget_progress")
+@login_required
+def budget_progress():
+    vendor = request.args.get("vendor") or None
+    timespan = request.args.get("timespan", "6m")
+
+    today = date.today()
+    if timespan == "ytd":
+        months_back = today.month
+    elif timespan == "all":
+        months_back = 60
+    else:
+        months_back = MONTHS_BY_TIMESPAN.get(timespan, 6)
+
+    budget = db.session.scalar(
+        select(Budget).where(Budget.user_id == current_user.id, Budget.vendor == vendor)
+    )
+    budget_amount = (budget.amount_cents / 100) if budget else 0
+
+    month_starts = []
+    y, m = today.year, today.month
+    for _ in range(months_back):
+        month_starts.append(date(y, m, 1))
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    month_starts.reverse()
+
+    points = []
+    for i, start in enumerate(month_starts):
+        if i + 1 < len(month_starts):
+            end = month_starts[i + 1]
+        else:
+            y2, m2 = (start.year + 1, 1) if start.month == 12 else (start.year, start.month + 1)
+            end = date(y2, m2, 1)
+
+        q = select(Transaction).where(
+            Transaction.user_id == current_user.id,
+            Transaction.date >= start,
+            Transaction.date < end,
+        )
+        if vendor:
+            q = q.where(Transaction.merchant_name == vendor)
+
+        spent_cents = sum(t.amount_cents for t in db.session.scalars(q) if t.amount_cents > 0)
+
+        points.append({
+            "month": start.strftime("%Y-%m"),
+            "spent": round(spent_cents / 100, 2),
+            "budget": budget_amount,
+        })
+
+    return jsonify(points=points)
 
 ### ACCOUNT MANAGEMENT ENDPOINTS
 
